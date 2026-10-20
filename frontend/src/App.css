@@ -84,6 +84,7 @@ button.link[aria-expanded="true"]::before { content: "▾"; }
 .parts th, .parts td { padding: 4px 22px 4px 0; border: 0; font-size: 0.92rem; font-weight: 400; text-align: left; white-space: nowrap; }
 .parts th { color: var(--slate); font-weight: 600; }
 .parts .num { text-align: right; }
+.parts + .parts { margin-top: 14px; }
 .detail-link { display: inline-block; margin-top: 10px; font-size: 0.92rem; }
 
 /* spread chart */

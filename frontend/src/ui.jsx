@@ -2,7 +2,7 @@ import { useState } from "react";
 
 export const show = (v) => (v === null || v === undefined ? "—" : v);
 
-const TEXT_KEYS = ["mod", "set_name"]; // these sort A→Z first; numbers sort high→low first
+const TEXT_KEYS = ["mod", "set_name", "arcane_name"]; // these sort A→Z first; numbers sort high→low first
 
 export function useSort(initialKey) {
   const [sortKey, setSortKey] = useState(initialKey);

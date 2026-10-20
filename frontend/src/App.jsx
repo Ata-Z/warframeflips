@@ -2,6 +2,7 @@ import { Link, NavLink, Route, Routes } from "react-router-dom";
 import Flips from "./pages/Flips";
 import Spread from "./pages/Spread";
 import Sets from "./pages/Sets";
+import Arcanes from "./pages/Arcanes";
 import "./App.css";
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
             <NavLink to="/" end>Mod flips</NavLink>
             <NavLink to="/spread">Spread history</NavLink>
             <NavLink to="/sets">Sets vs parts</NavLink>
+            <NavLink to="/arcanes">Arcanes</NavLink>
           </nav>
         </div>
       </header>
@@ -21,6 +23,7 @@ export default function App() {
         <Route path="/" element={<Flips />} />
         <Route path="/spread" element={<Spread />} />
         <Route path="/sets" element={<Sets />} />
+        <Route path="/arcanes" element={<Arcanes />} />
       </Routes>
     </>
   );
