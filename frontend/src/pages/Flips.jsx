@@ -6,7 +6,6 @@ export default function Flips() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [minProfit, setMinProfit] = useState("");
   const { sortKey, sortDir, onSort } = useSort("profit");
 
   const load = useCallback(async () => {
@@ -24,11 +23,8 @@ export default function Flips() {
   const visible = useMemo(() => {
     if (!rows) return [];
     const q = search.trim().toLowerCase().replaceAll(" ", "_");
-    const filtered = rows
-      .filter((r) => r.mod.includes(q))
-      .filter((r) => minProfit === "" || (r.profit !== null && r.profit >= Number(minProfit)));
-    return sortRows(filtered, sortKey, sortDir);
-  }, [rows, search, minProfit, sortKey, sortDir]);
+    return sortRows(rows.filter((r) => r.mod.includes(q)), sortKey, sortDir);
+  }, [rows, search, sortKey, sortDir]);
 
   if (error) {
     return <main><p className="note">Couldn't load prices: {error}. Check the Supabase keys and the read policy on mod_prices.</p></main>;
@@ -41,7 +37,7 @@ export default function Flips() {
 
   return (
     <main>
-      <h1>Mod flips</h1>
+      <h1>Mods</h1>
       <p className="lede">
         Buy at the cheapest online sell order, sell to the highest online buy order. Prices in platinum.
         {updated && <> Updated {new Date(updated).toLocaleString()}.</>}
@@ -50,10 +46,6 @@ export default function Flips() {
       <div className="controls">
         <input className="search" type="text" placeholder="Search mods" value={search}
           onChange={(e) => setSearch(e.target.value)} aria-label="Search mods" />
-        <label className="field">
-          Minimum profit
-          <input type="number" value={minProfit} onChange={(e) => setMinProfit(e.target.value)} />
-        </label>
       </div>
 
       <div className="table-wrap">
@@ -70,7 +62,7 @@ export default function Flips() {
           </thead>
           <tbody>
             {visible.length === 0 && (
-              <tr><td colSpan={6} className="note">No mods match these filters.</td></tr>
+              <tr><td colSpan={6} className="note">No mods match your search.</td></tr>
             )}
             {visible.map((r) => (
               <tr key={r.mod}>

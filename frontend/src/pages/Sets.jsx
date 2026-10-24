@@ -53,8 +53,8 @@ export default function Sets() {
       <h1>Sets vs parts</h1>
       <p className="lede">
         Compare a set's price with its parts added together. You pay the cheapest online sell price
-        and receive the highest online buy price. A dash means a part has no online order on that side.
-        Prices in platinum. Updated {new Date(updated).toLocaleString()}.
+        and receive the highest online buy price.
+        Updated {new Date(updated).toLocaleString()}.
       </p>
 
       <div className="controls">

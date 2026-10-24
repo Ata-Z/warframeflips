@@ -43,9 +43,7 @@ export default function Arcanes() {
     <main>
       <h1>Arcane builds</h1>
       <p className="lede">
-        The cheapest mix of arcanes, at any rank, that combines into the rank that sells best.
-        A rank r arcane counts as (r+1)(r+2)/2 copies, so seven R1s make an R5.
-        Only in-game players count, and buy orders above a cheaper listing are ignored as fake.
+        The cheapest mix of arcanes at different ranks combined <br></br>
         Updated {new Date(updated).toLocaleString()}.
       </p>
 

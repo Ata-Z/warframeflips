@@ -1,4 +1,3 @@
-"""Shared helpers for talking to the warframe.market API and Supabase."""
 import asyncio
 import os
 import time
@@ -38,7 +37,6 @@ def market_client():
 
 
 async def get(client, limiter, path):
-    """GET a market API path and return its "data" field, or None on 404 / repeated failure."""
     for attempt in range(1, MAX_RETRIES + 1):
         await limiter.wait()
         try:
