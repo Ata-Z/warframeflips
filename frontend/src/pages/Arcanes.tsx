@@ -1,14 +1,15 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import { ProfitCell, SortTh, show, sortRows, useSort } from "../ui";
+import type { ArcanePrice } from "../types";
 
-const rankLabel = (r) => (r === null || r === undefined ? "—" : `R${r}`);
+const rankLabel = (r: number | null | undefined) => (r === null || r === undefined ? "—" : `R${r}`);
 
 export default function Arcanes() {
-  const [rows, setRows] = useState(null);
-  const [error, setError] = useState(null);
+  const [rows, setRows] = useState<ArcanePrice[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(null);
+  const [open, setOpen] = useState<string | null>(null);
   const { sortKey, sortDir, onSort } = useSort("profit");
 
   useEffect(() => {

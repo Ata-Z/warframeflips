@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../supabase";
-import { Author } from "./Forums";
+import { Author, type ForumProps } from "./Forums";
 import { timeAgo } from "../ui";
+import type { Post as PostRow, ThreadDetail } from "../types";
 
 const AUTHOR = "author:profiles(username, avatar_url)";
 
-function Post({ post, canDelete, onDelete }) {
+function Post({ post, canDelete, onDelete }: { post: PostRow; canDelete: boolean; onDelete: () => void }) {
   return (
     <article className="forum-post">
       <header className="forum-meta">
@@ -23,23 +24,25 @@ function Post({ post, canDelete, onDelete }) {
   );
 }
 
-export default function Thread({ user, onLogin }) {
-  const { id } = useParams();
+export default function Thread({ user, onLogin }: ForumProps) {
+  const { id } = useParams() as { id: string };
   const navigate = useNavigate();
-  const [thread, setThread] = useState(null);
-  const [posts, setPosts] = useState([]);
-  const [error, setError] = useState(null);
+  const [thread, setThread] = useState<ThreadDetail | null>(null);
+  const [posts, setPosts] = useState<PostRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [reply, setReply] = useState("");
   const [posting, setPosting] = useState(false);
 
   useEffect(() => {
     let live = true;
     Promise.all([
-      supabase.from("threads").select(`id, title, body, author_id, created_at, ${AUTHOR}`).eq("id", id).maybeSingle(),
-      supabase.from("posts").select(`id, body, author_id, created_at, ${AUTHOR}`).eq("thread_id", id).order("created_at"),
+      supabase.from("threads").select(`id, title, body, author_id, created_at, ${AUTHOR}`).eq("id", id)
+        .maybeSingle<ThreadDetail>(),
+      supabase.from("posts").select(`id, body, author_id, created_at, ${AUTHOR}`).eq("thread_id", id).order("created_at")
+        .overrideTypes<PostRow[], { merge: false }>(),
     ]).then(([t, p]) => {
       if (!live) return;
-      if (t.error || p.error) return setError((t.error || p.error).message);
+      if (t.error || p.error) return setError((t.error || p.error)!.message);
       if (!t.data) return setError("This thread doesn't exist or was deleted.");
       setThread(t.data);
       setPosts(p.data);
@@ -47,14 +50,14 @@ export default function Thread({ user, onLogin }) {
     return () => { live = false; };
   }, [id]);
 
-  async function onReply(e) {
+  async function onReply(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPosting(true);
     const { data, error } = await supabase
       .from("posts")
       .insert({ thread_id: Number(id), body: reply.trim() })
       .select(`id, body, author_id, created_at, ${AUTHOR}`)
-      .single();
+      .single<PostRow>();
     setPosting(false);
     if (error) return setError(error.message);
     setPosts((ps) => [...ps, data]);
@@ -68,7 +71,7 @@ export default function Thread({ user, onLogin }) {
     navigate("/forums");
   }
 
-  async function deletePost(postId) {
+  async function deletePost(postId: number) {
     if (!confirm("Delete this reply?")) return;
     const { error } = await supabase.from("posts").delete().eq("id", postId);
     if (error) return setError(error.message);

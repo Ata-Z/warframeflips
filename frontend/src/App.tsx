@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import Flips from "./pages/Flips";
 import Spread from "./pages/Spread";
@@ -14,7 +15,7 @@ import "./App.css";
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const { pathname } = useLocation();
 
   useEffect(() => setMenuOpen(false), [pathname]);

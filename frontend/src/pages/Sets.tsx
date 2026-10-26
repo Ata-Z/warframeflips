@@ -1,18 +1,22 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import { ProfitCell, SortTh, show, sortRows, useSort } from "../ui";
+import type { SetPrice } from "../types";
 
-const MODES = {
+type PriceKey = "set_sell" | "set_buy" | "parts_sell_total" | "parts_buy_total" | "assemble_profit" | "break_profit";
+type Mode = "build" | "break";
+
+const MODES: Record<Mode, { label: string; pay: PriceKey; get: PriceKey; profit: PriceKey }> = {
   build: { label: "Buy parts, sell set", pay: "parts_sell_total", get: "set_buy", profit: "assemble_profit" },
   break: { label: "Buy set, sell parts", pay: "set_sell", get: "parts_buy_total", profit: "break_profit" },
 };
 
 export default function Sets() {
-  const [rows, setRows] = useState(null);
-  const [error, setError] = useState(null);
-  const [mode, setMode] = useState("build");
+  const [rows, setRows] = useState<SetPrice[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>("build");
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(null);
+  const [open, setOpen] = useState<string | null>(null);
   const { sortKey, sortDir, onSort } = useSort("profit");
 
   useEffect(() => {
@@ -59,7 +63,7 @@ export default function Sets() {
 
       <div className="controls">
         <div className="seg" role="group" aria-label="Trade direction">
-          {Object.entries(MODES).map(([key, v]) => (
+          {(Object.entries(MODES) as [Mode, (typeof MODES)[Mode]][]).map(([key, v]) => (
             <button key={key} type="button" aria-pressed={mode === key} onClick={() => setMode(key)}>
               {v.label}
             </button>

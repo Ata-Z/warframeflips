@@ -1,19 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "../supabase";
 import { timeAgo } from "../ui";
+import type { Profile, ThreadSummary } from "../types";
 
 const PAGE_SIZE = 25;
 
-function fetchPage(offset) {
+function fetchPage(offset: number) {
   return supabase
     .from("threads")
     .select("id, title, reply_count, created_at, last_post_at, author:profiles(username, avatar_url)")
     .order("last_post_at", { ascending: false })
-    .range(offset, offset + PAGE_SIZE); // one extra row tells us if there's another page
+    .range(offset, offset + PAGE_SIZE) // one extra row tells us if there's another page
+    .overrideTypes<ThreadSummary[], { merge: false }>();
 }
 
-export function Author({ profile }) {
+export interface ForumProps {
+  user: User | null;
+  onLogin: () => void;
+}
+
+export function Author({ profile }: { profile: Profile | null }) {
   return (
     <span className="forum-author">
       {profile?.avatar_url
@@ -24,28 +32,28 @@ export function Author({ profile }) {
   );
 }
 
-export default function Forums({ user, onLogin }) {
+export default function Forums({ user, onLogin }: ForumProps) {
   const navigate = useNavigate();
-  const [threads, setThreads] = useState(null);
-  const [error, setError] = useState(null);
+  const [threads, setThreads] = useState<ThreadSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
 
-  function load(offset) {
+  function load(offset: number) {
     return fetchPage(offset).then(({ data, error }) => {
       if (error) return setError(error.message);
       setHasMore(data.length > PAGE_SIZE);
       const page = data.slice(0, PAGE_SIZE);
-      setThreads((prev) => (offset ? [...prev, ...page] : page));
+      setThreads((prev) => (offset && prev ? [...prev, ...page] : page));
     });
   }
 
   useEffect(() => { load(0); }, []);
 
-  async function onSubmit(e) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPosting(true);
     const { data, error } = await supabase
@@ -98,7 +106,7 @@ export default function Forums({ user, onLogin }) {
       {threads === null && !error && <p className="note">Loading…</p>}
       {threads?.length === 0 && <p className="note">No threads yet. Start the first one!</p>}
 
-      {threads?.length > 0 && (
+      {threads && threads.length > 0 && (
         <ul className="forum-list">
           {threads.map((t) => (
             <li key={t.id}>
@@ -114,7 +122,7 @@ export default function Forums({ user, onLogin }) {
       )}
 
       {hasMore && (
-        <button type="button" className="account-btn forum-more" onClick={() => load(threads.length)}>
+        <button type="button" className="account-btn forum-more" onClick={() => load(threads?.length ?? 0)}>
           Load more
         </button>
       )}

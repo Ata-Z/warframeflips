@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import { ProfitCell, SortTh, show, sortRows, useSort } from "../ui";
+import type { ModPrice } from "../types";
 
 export default function Flips() {
-  const [rows, setRows] = useState(null);
-  const [error, setError] = useState(null);
+  const [rows, setRows] = useState<ModPrice[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const { sortKey, sortDir, onSort } = useSort("profit");
 
@@ -39,7 +40,7 @@ export default function Flips() {
     <main>
       <h1>Mods</h1>
       <p className="lede">
-        Buy at the cheapest online sell order, sell to the highest online buy order. Prices in platinum.
+        Buy at the cheapest online sell order, sell to the highest online buy order. Prices are platinum. <br></br>
         {updated && <> Updated {new Date(updated).toLocaleString()}.</>}
       </p>
 

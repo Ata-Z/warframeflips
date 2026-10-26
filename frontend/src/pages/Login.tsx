@@ -1,21 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { supabase } from "../supabase";
 
-export default function LoginDialog({ open, onClose }) {
-  const ref = useRef(null);
-  const [mode, setMode] = useState("login");
+type Mode = "login" | "signup";
+
+export default function LoginDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [mode, setMode] = useState<Mode>("login");
   const [submitted, setSubmitted] = useState(false);
-  const [oauthError, setOauthError] = useState(null);
+  const [oauthError, setOauthError] = useState<string | null>(null);
   const signup = mode === "signup";
 
   useEffect(() => {
     const dialog = ref.current;
+    if (!dialog) return;
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
     if (!open) { setSubmitted(false); setOauthError(null); }
   }, [open]);
 
-  function switchTo(next) {
+  function switchTo(next: Mode) {
     setMode(next);
     setSubmitted(false);
   }
@@ -30,7 +33,7 @@ export default function LoginDialog({ open, onClose }) {
     if (error) setOauthError(error.message);
   }
 
-  function onSubmit(e) {
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitted(true); // no backend yet
   }

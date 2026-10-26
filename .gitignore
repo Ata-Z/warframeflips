@@ -4,3 +4,6 @@ __pycache__/
 .env.local
 node_modules/
 dist/
+
+# old JavaScript frontend, kept locally for reference
+frontend-js/

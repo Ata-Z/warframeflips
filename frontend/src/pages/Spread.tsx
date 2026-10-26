@@ -4,25 +4,57 @@ import {
   Area, Bar, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
+import type { CSSProperties } from "react";
+import type { TooltipContentProps } from "recharts";
 import { supabase } from "../supabase";
+import type { HistoryBucket } from "../types";
 
-const RANGES = {
+type Range = "24h" | "7d" | "30d";
+const RANGES: Record<Range, { hours: number; bucket: number }> = {
   "24h": { hours: 24, bucket: 30 },
   "7d": { hours: 24 * 7, bucket: 180 },
   "30d": { hours: 24 * 30, bucket: 720 },
 };
+const isRange = (r: string | null): r is Range => r !== null && r in RANGES;
 const COLORS = { gain: "#5DDC7A", loss: "#FF6B6B", grid: "#263238", axis: "#8A9AA3" };
 
 // Each unit has its own scale. Platinum sits on the left; the first other unit that's
 // switched on gets the right-hand axis, and any further ones keep their own hidden scale.
-const AXES = {
+type AxisId = "plat" | "ratio" | "count";
+const AXES: Record<AxisId, { unit: string }> = {
   plat: { unit: "p" },
   ratio: { unit: "×" },
   count: { unit: "" },
 };
 
+type SeriesKey = "profit" | "range" | "ratio" | "seller" | "buyer" | "sellers" | "buyers";
+interface Series {
+  key: SeriesKey;
+  label: string;
+  axis: AxisId;
+  kind: "bar" | "area" | "line";
+  color: string;
+  extended?: boolean;
+}
+
+// One chart slot per time bucket; values are null where the bucket had no data
+interface Point {
+  t: number;
+  full: string;
+  profit: number | null;
+  minProfit: number | null;
+  maxProfit: number | null;
+  range: [number, number] | null;
+  seller: number | null;
+  buyer: number | null;
+  sellers: number | null;
+  buyers: number | null;
+  ratio: number | null;
+  samples: number;
+}
+
 // "extended" statistics need the mod_stats_history function in Supabase
-const SERIES = [
+const SERIES: Series[] = [
   { key: "profit", label: "Profit", axis: "plat", kind: "bar", color: COLORS.gain },
   { key: "range", label: "Profit range", axis: "plat", kind: "area", color: COLORS.gain, extended: true },
   { key: "ratio", label: "Buyers per seller", axis: "ratio", kind: "line", color: "#4FD1C5", extended: true },
@@ -31,12 +63,16 @@ const SERIES = [
   { key: "sellers", label: "Sellers online", axis: "count", kind: "line", color: "#B48CFF", extended: true },
   { key: "buyers", label: "Buyers online", axis: "count", kind: "line", color: "#9AA8B1", extended: true },
 ];
-const DEFAULT_ON = ["profit", "seller", "buyer"];
+const DEFAULT_ON: SeriesKey[] = ["profit", "seller", "buyer"];
 
-const num = (v) => (v === null || v === undefined ? null : Number(v));
-const round = (v, digits = 0) => (v === null ? null : Number(v.toFixed(digits)));
+const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
+function round(v: number, digits?: number): number;
+function round(v: number | null, digits?: number): number | null;
+function round(v: number | null, digits = 0) {
+  return v === null ? null : Number(v.toFixed(digits));
+}
 
-function formatValue(s, p) {
+function formatValue(s: Series, p: Point) {
   if (s.key === "range") {
     return p.minProfit === null ? "—" : `${p.minProfit} to ${p.maxProfit}p`;
   }
@@ -44,9 +80,9 @@ function formatValue(s, p) {
   return v === null || v === undefined ? "—" : `${v}${AXES[s.axis].unit}`;
 }
 
-function StatsTooltip({ active, payload, series }) {
+function StatsTooltip({ active, payload, series }: Partial<TooltipContentProps<number, string>> & { series: Series[] }) {
   if (!active || !payload?.length) return null;
-  const p = payload[0].payload;
+  const p: Point = payload[0].payload;
   if (!p.samples) {
     return (
       <div className="tooltip">
@@ -69,19 +105,19 @@ function StatsTooltip({ active, payload, series }) {
   );
 }
 
-async function loadHistory(mod, since, bucket) {
+async function loadHistory(mod: string, since: string, bucket: number) {
   const args = { p_mod: mod, p_since: since, p_bucket_minutes: bucket };
   const full = await supabase.rpc("mod_stats_history", args);
-  if (!full.error) return { data: full.data, extended: true };
+  if (!full.error) return { data: full.data as HistoryBucket[], error: null, extended: true };
   // the extended function hasn't been created yet: fall back to price-only history
   const basic = await supabase.rpc("mod_spread_history", args);
-  return { data: basic.data, error: basic.error, extended: false };
+  return { data: basic.data as HistoryBucket[] | null, error: basic.error, extended: false };
 }
 
 // How far the buy price typically strays from its average, as a % of that average
 // (sample-weighted standard deviation over mean). Under 5% barely moves; over 15% swings hard.
-function priceStability(filled) {
-  const valid = filled.filter((d) => d.seller !== null);
+function priceStability(filled: Point[]) {
+  const valid = filled.filter((d): d is Point & { seller: number } => d.seller !== null);
   const total = valid.reduce((n, d) => n + d.samples, 0);
   if (valid.length < 2 || !total) return null;
   const mean = valid.reduce((sum, d) => sum + d.seller * d.samples, 0) / total;
@@ -92,13 +128,13 @@ function priceStability(filled) {
 }
 
 // Headline numbers for the whole selected range, weighted by how many samples each bucket has
-function summarize(data) {
-  const filled = data.filter((d) => d.samples > 0 && d.profit !== null);
+function summarize(data: Point[]) {
+  const filled = data.filter((d): d is Point & { profit: number } => d.samples > 0 && d.profit !== null);
   if (!filled.length) return null;
-  const weighted = (key) => {
+  const weighted = (key: "profit" | "ratio") => {
     const valid = filled.filter((d) => d[key] !== null);
     const total = valid.reduce((n, d) => n + d.samples, 0);
-    return total ? valid.reduce((sum, d) => sum + d[key] * d.samples, 0) / total : null;
+    return total ? valid.reduce((sum, d) => sum + d[key]! * d.samples, 0) / total : null;
   };
   const best = filled.reduce((a, b) => ((b.maxProfit ?? b.profit) > (a.maxProfit ?? a.profit) ? b : a));
   return {
@@ -113,18 +149,19 @@ function summarize(data) {
 export default function Spread() {
   const [params, setParams] = useSearchParams();
   const mod = params.get("mod") || "";
-  const range = RANGES[params.get("range")] ? params.get("range") : "24h";
+  const rangeParam = params.get("range");
+  const range: Range = isRange(rangeParam) ? rangeParam : "24h";
 
-  const [allMods, setAllMods] = useState([]);
+  const [allMods, setAllMods] = useState<string[]>([]);
   const [text, setText] = useState(mod.replaceAll("_", " "));
-  const [rows, setRows] = useState(null);
+  const [rows, setRows] = useState<HistoryBucket[] | null>(null);
   const [extended, setExtended] = useState(true);
-  const [error, setError] = useState(null);
-  const [shown, setShown] = useState(() => new Set(DEFAULT_ON));
+  const [error, setError] = useState<string | null>(null);
+  const [shown, setShown] = useState(() => new Set<SeriesKey>(DEFAULT_ON));
 
   useEffect(() => {
     supabase.from("mod_prices").select("mod").order("mod")
-      .then(({ data }) => setAllMods((data || []).map((r) => r.mod)));
+      .then(({ data }) => setAllMods((data || []).map((r: { mod: string }) => r.mod)));
   }, []);
 
   useEffect(() => {
@@ -143,17 +180,17 @@ export default function Spread() {
     return () => { cancelled = true; };
   }, [mod, range]);
 
-  function onSearch(value) {
+  function onSearch(value: string) {
     setText(value);
     const slug = value.trim().toLowerCase().replaceAll(" ", "_");
     if (allMods.includes(slug)) setParams({ mod: slug, range });
   }
 
-  function changeRange(r) {
+  function changeRange(r: Range) {
     setParams(mod ? { mod, range: r } : { range: r });
   }
 
-  function toggle(key) {
+  function toggle(key: SeriesKey) {
     setShown((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -170,7 +207,7 @@ export default function Spread() {
     const byTime = new Map((rows || []).map((r) => [new Date(r.bucket).getTime(), r]));
 
     // one slot per bucket, so missing data shows up as a gap
-    const data = [];
+    const data: Point[] = [];
     for (let t = start; t <= end; t += bucketMs) {
       const r = byTime.get(t);
       const profit = num(r?.avg_profit);
@@ -198,17 +235,17 @@ export default function Spread() {
     // label the first bucket of each evenly sized step, in local time
     const stepMs =
       range === "24h" ? 3 * 3_600_000 : range === "7d" ? 24 * 3_600_000 : 5 * 24 * 3_600_000;
-    const localStep = (t) =>
+    const localStep = (t: number) =>
       Math.floor((t - new Date(t).getTimezoneOffset() * 60_000) / stepMs);
     const tickList = data
       .filter((d, i) => i > 0 && localStep(d.t) !== localStep(data[i - 1].t))
       .map((d) => d.t);
 
-    const opts =
+    const opts: Intl.DateTimeFormatOptions =
       range === "24h" ? { hour: "2-digit", minute: "2-digit" }
       : range === "7d" ? { weekday: "short", day: "numeric" }
       : { month: "short", day: "numeric" };
-    const formatTick = (t) => new Date(t).toLocaleString([], opts);
+    const formatTick = (t: number) => new Date(t).toLocaleString([], opts);
 
     return { chartData: data, ticks: tickList, formatTick };
   }, [rows, range]);
@@ -235,7 +272,7 @@ export default function Spread() {
           {allMods.map((m) => <option key={m} value={m.replaceAll("_", " ")} />)}
         </datalist>
         <div className="seg" role="group" aria-label="Time range">
-          {Object.keys(RANGES).map((r) => (
+          {(Object.keys(RANGES) as Range[]).map((r) => (
             <button key={r} type="button" aria-pressed={r === range} onClick={() => changeRange(r)}>
               {r}
             </button>
@@ -288,7 +325,7 @@ export default function Spread() {
                 <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
                 <XAxis dataKey="t" ticks={ticks} tickFormatter={formatTick} interval="preserveStart"
                   minTickGap={12} stroke={COLORS.axis} />
-                {Object.entries(AXES).map(([id, a]) => {
+                {(Object.entries(AXES) as [AxisId, { unit: string }][]).map(([id, a]) => {
                   const hidden = id === "plat" ? !showPlat : id !== rightAxis;
                   // hidden axes still reserve their width, so shrink them to nothing
                   return (
@@ -305,7 +342,7 @@ export default function Spread() {
                     return (
                       <Bar key={s.key} yAxisId={s.axis} dataKey={s.key} isAnimationActive={false}>
                         {chartData.map((d, i) => (
-                          <Cell key={i} fill={d.profit >= 0 ? COLORS.gain : COLORS.loss} fillOpacity={0.55} />
+                          <Cell key={i} fill={(d.profit ?? 0) >= 0 ? COLORS.gain : COLORS.loss} fillOpacity={0.55} />
                         ))}
                       </Bar>
                     );
@@ -330,7 +367,7 @@ export default function Spread() {
           <div className="series-toggles" role="group" aria-label="Statistics shown">
             {available.map((s) => (
               <button key={s.key} type="button" className="series-toggle" aria-pressed={shown.has(s.key)}
-                onClick={() => toggle(s.key)} style={{ "--swatch": s.color }}>
+                onClick={() => toggle(s.key)} style={{ "--swatch": s.color } as CSSProperties}>
                 <span className={`swatch ${s.kind}`} aria-hidden="true" />
                 {s.label}
               </button>
